@@ -1,0 +1,51 @@
+name: Build and Push Docker Image
+on:
+  push:
+    branches:
+      - infra
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  ECR_REPOSITORY_BASE_URL: 510626941593.dkr.ecr.us-east-1.amazonaws.com
+  AWS_REGION: us-east-1
+  ATHLETEX_SERVICE_REPONAME: athletex-api
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-image:
+    name: Build, Scan Image and Push on PR merge
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Cleanup Everything
+        uses: colpal/actions-clean@v1
+
+      - name: Get Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::510626941593:role/github-actions-role
+          role-duration-seconds: 3600
+          role-session-name: GithubActions-PushImage
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v2
+        with:
+          push: true
+          context: .
+          tags: |
+            ${{ env.ECR_REPOSITORY_BASE_URL }}/${{ env.ATHLETEX_SERVICE_REPONAME }}:${{ github.sha }}
+
+      - name: Cleanup Everything
+        uses: colpal/actions-clean@v1
+        if: ${{ always() }}
